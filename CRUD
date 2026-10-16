@@ -1,0 +1,134 @@
+===================================================================
+MONGODB GENERALIZED CRUD OPERATIONS CHEAT SHEET
+===================================================================
+
+1. CREATE (INSERT OPERATIONS)
+===================================================================
+# Inserts a single document into the target collection
+db.<collection>.insert({ field1: "value1", field2: "value2" })
+
+# Initializes and executes an ordered sequence of bulk operations (stops if an error occurs)
+var bulk = db.<collection>.initializeOrderedBulkOp();
+bulk.insert({ _id: 1, field: "value1" });
+bulk.insert({ _id: 2, field: "value2" });
+bulk.execute();
+
+# Initializes and executes an unordered bulk sequence (continues even if individual operations error)
+var bulk = db.<collection>.initializeUnorderedBulkOp();
+bulk.insert({ _id: 1, field: "value1" });
+bulk.insert({ _id: 2, field: "value2" });
+bulk.execute();
+
+
+2. READ (QUERYING OPERATIONS)
+===================================================================
+# Reads all documents from the collection
+db.<collection>.find()
+
+# Limits the query output to a specific number of documents
+db.<collection>.find().limit(3)
+
+# Sorts results in Ascending (1) or Descending (-1) order based on a specific field
+db.<collection>.find().sort({ field: 1 })
+
+# Skips a designated number of initial documents from the query results
+db.<collection>.find().sort({ field: 1 }).skip(3)
+
+# Projects only specific fields (1) while excluding or including others
+db.<collection>.find({}, { field1: 1, field2: 1 })
+
+# Queries documents using a "Less Than" ($lt) comparison filter
+db.<collection>.find({ field: { $lt: 200 } })
+
+# Queries documents using an exact match equality filter
+db.<collection>.find({ field: "exact_value" })
+
+# Finds documents matching any value within a specified array using the $in operator
+db.<collection>.find({ field: { $in: [ "value1", "value2" ] } })
+
+
+3. LOGICAL OPERATORS (AND / OR)
+===================================================================
+# Implicit AND operation: Finds documents matching all comma-separated criteria
+db.<collection>.find({ field1: "value1", field2: { $gt: 100 } })
+
+# Explicit OR operation: Finds documents matching at least one condition in the array
+db.<collection>.find({ $or: [ { field1: "value1" }, { field2: "value2" } ] })
+
+# Compounded AND + OR query: Evaluates the OR array criteria combined with the top-level constraint
+db.<collection>.find({ field1: { $gt: 100 }, $or: [ { field2: true }, { field3: { $gt: 50 } } ] })
+
+
+4. REGULAR EXPRESSIONS (REGEX)
+===================================================================
+# Substring match: Finds documents containing a specific sequence of characters
+db.<collection>.find({ field: /substring/ })
+
+# Case-insensitive match anchored to the start (^) of a string
+db.<collection>.find({ field: /^start_text/i })
+
+# Case-insensitive match anchored to the end ($) of a string
+db.<collection>.find({ field: /end_text$/i })
+
+# Explicit regex declaration utilizing the $regex operator tag
+db.<collection>.find({ field: { $regex: /pattern/i } })
+
+
+5. ARRAY TRACKING OPERATORS
+===================================================================
+# Validates an exact string match inside an array layer
+db.<collection>.find({ arrayField: "value" })
+
+# Queries a specific index offset inside an array using dot-notation layout
+db.<collection>.find({ 'arrayField.2': "value" })
+
+# Intersection lookup: Finds arrays containing all specified elements using $all
+db.<collection>.find({ arrayField: { $all: [ "value1", "value2" ] } })
+
+# Truncates and returns only a slice subset of elements from an array layout
+db.<collection>.find({}, { arrayField: { $slice: 2 } })
+
+
+6. UPDATE OPERATIONS
+===================================================================
+# Document replacement: Overwrites the first matching document entirely with a new schema
+db.<collection>.update({ criteriaField: "match" }, { newField1: "val", newField2: "val" })
+
+# Selective modification: Updates specific fields on the first matched record using $set
+db.<collection>.update({ criteriaField: "match" }, { $set: { targetField: "new_value" } })
+
+# Field deletion: Removes specific fields completely from the matched document using $unset
+db.<collection>.update({ criteriaField: "match" }, { $unset: { targetField: "" } })
+
+# Atomic mathematical stepping: Increments or decrements a numeric value using $inc
+db.<collection>.update({ criteriaField: "match" }, { $inc: { numericField: 1000 } })
+
+# Upsert operation: Updates matching record, or automatically inserts a new one if no match is found
+db.<collection>.update({ criteriaField: "match" }, { field: "value" }, { upsert: true })
+
+# Multi-document updates: Modifies all records matching the criteria (requires $set or execution blocks)
+db.<collection>.update({ criteriaField: "match" }, { $set: { field: "value" } }, { multi: true })
+
+
+7. DELETE & NAMESPACE ADMINISTRATION
+===================================================================
+# Filtered delete: Removes all documents that match a specific criteria
+db.<collection>.remove({ criteriaField: "match" })
+
+# Single target delete: Removes only the first single document matching the filter criteria
+db.<collection>.remove({ criteriaField: "match" }, 1)
+
+# Absolute clear: Wipes all documents from a collection without removing the collection itself
+db.<collection>.remove({})
+
+# Permanent drop: Drops the entire collection space and its associated index footprints cleanly
+db.<collection>.drop()
+
+
+8. CAPPED COLLECTIONS
+===================================================================
+# Creates a new fixed-size capped collection with byte sizing and element boundary rules
+db.createCollection("name", { capped: true, size: 102400, max: 5000 })
+
+# Converts an existing operational table directly into a capped system setup
+db.runCommand({ convertToCapped: "target_collection_name", size: 102400 })
