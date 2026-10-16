@@ -26,6 +26,17 @@ db.student.updateMany(
   { $set: { "address.country": "Bharat" } }
 )
 
+Sorting : db.student.find().sort({"address.state":1})
+
+Sorting with Limitation : db.student.find().sort({"address.state":1}).limit(3)
+
+
+
+
+
+
+
+
 
 
 
