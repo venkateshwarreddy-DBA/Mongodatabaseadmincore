@@ -26,6 +26,31 @@ db.student.updateMany(
   { $set: { "address.country": "Bharat" } }
 )
 
+
+
+Check the current number of connections to MongoDb in mongo shell Count by ClientIP,:
+=========================================================================================
+db.currentOp(true).inprog.reduce(
+  (accumulator, connection) => {
+    ipaddress = connection.client ? connection.client.split(":")[0] : "Internal";
+    accumulator[ipaddress] = (accumulator[ipaddress] || 0) + 1;
+    accumulator["TOTAL_CONNECTION_COUNT"]++;
+    return accumulator;
+  },
+  { TOTAL_CONNECTION_COUNT: 0 }
+)
+
+
+
+
+Check the current number of connections to MongoDb at OS shell level Count by ClientIP,::
+=========================================================================================
+
+sudo lsof -i TCP -a -c mongod
+
+
+
+
 Sorting : db.student.find().sort({"address.state":1})
 
 Sorting with Limitation : db.student.find().sort({"address.state":1}).limit(3)
@@ -490,6 +515,9 @@ The output of `db.serverStatus()` provides an extensive deep-dive window into th
 
 ---
 
+
+
+-------------
 
 
 
