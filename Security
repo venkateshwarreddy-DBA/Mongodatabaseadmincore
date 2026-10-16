@@ -1,0 +1,161 @@
+# MONGODB SECURITY COMMANDS & ROLES REFERENCE
+
+---
+
+## SECTION 1: ALL SECURITY COMMANDS
+
+### 🔐 Authentication & Session Auditing
+* **`db.auth("username", "password")`**
+  Authenticates a user session within the current database context.
+* **`db.runCommand({ connectionStatus: 1 })`**
+  Returns information about the current connection, listing the active user (`authenticatedUsers`) and their privileges (`authenticatedUserRoles`).
+* **`db.logout()`**
+  Terminates the current authenticated session for the active database.
+
+### 👤 User Management
+* **`db.createUser({ user: "name", pwd: "pwd", roles: [...] })`**
+  Creates a brand new user with assigned access roles on the target database.
+* **`db.updateUser("username", { pwd: "newPassword", writeConcern: ..., customData: ... })`**
+  Updates a user's structural profile details, custom data, or execution properties. 
+  *(Note: From MongoDB 3.X onwards, this is the standard method used to change a user's password).*
+* **`db.changeUserPassword("username", "newPassword")`**
+  An administrative helper to update only a user's password. 
+  *(Syntax note for Legacy MongoDB v2.X: used as `db.changeUserPassword("username", "password")`).*
+* **`db.dropUser("username")`**
+  Removes and deletes a specific user from the active database where they exist. Returns `true` on success.
+* **`db.dropAllUsersFromDatabase()`** or **`db.runCommand({ dropAllUsersFromDatabase: 1 })`**
+  Drops and removes all users associated with the current database at once.
+
+### 🛡️ Role & Privilege Administration
+* **`db.grantRolesToUser("username", [{ role: "roleName", db: "dbName" }])`**
+  Adds extra roles/permissions to an existing user without overwriting their old ones.
+* **`db.revokeRolesFromUser("username", [{ role: "role1", db: "db1" }, { role: "role2", db: "db2" }])`**
+  Removes specific roles or scope privileges from a user. Can remove multiple roles across different databases simultaneously.
+* **`db.createRole({ role: "customRole", privileges: [...], roles: [...] })`**
+  Creates a user-defined custom role with highly tailored privileges, specific resource boundaries, and permitted actions.
+* **`db.updateRole("customRole", { privileges: [...] })`**
+  Edits the rules, resources, or actions assigned to a custom role.
+* **`db.dropRole("customRole")`**
+  Deletes a custom role from the current database.
+
+### 🔍 Security Inspection & Auditing
+* **`show users`**
+  Quick shell helper to show all user profiles registered inside the current database.
+* **`db.getUsers()`**
+  The explicit JavaScript method equivalent to `show users`.
+* **`db.getUser("username")`**
+  Used by administrators to find and view a targeted user's specific setup permissions, details, and inherited roles.
+* **`db.getRoles({ showBuiltinRoles: true })`**
+  Lists all roles available in the active database. Setting `showBuiltinRoles` to `true` exposes global system defaults.
+* **`db.getRole("roleName")`**
+  Inspects a specific custom or built-in role to view its exact resource privileges.
+* **`use admin` followed by `db.system.users.find()`**
+  Queries the internal system catalog collection inside the `admin` database directly to audit and list all users created across **all** databases on the entire cluster instance.
+
+---
+
+## SECTION 2: ALL BUILT-IN MONGODB ROLES
+
+### 📁 Single-Database Roles
+* **`read`**
+  Allows a user to read data (run queries, find documents) on all non-system collections.
+* **`readWrite`**
+  Provides full data modification rights. Users can insert, update, or delete documents on all non-system collections.
+
+### 🗄️ Database Administration Roles
+* **`dbAdmin`**
+  Allows structural administration tasks within the specific database. A user with this role can create collections, drop collections, manage indexes, run the profiler, and generate execution plans. *Security Restriction: They are strictly not allowed to modify collection document data itself.*
+* **`userAdmin`**
+  Grants the ability to create, update, delete, and manage users and custom roles on that specific database. 
+  *🔒 Security Warning: Because a `userAdmin` can grant any rights (including their own) to other users, they are indirectly a `dbOwner`. If a user gets `userAdmin` rights on the global `admin` database, they can assign themselves to the `root` role to become a complete system superuser.*
+* **`dbOwner`**
+  The absolute master of the local database. Combines the full permissions of `readWrite`, `dbAdmin`, and `userAdmin` into a single container role.
+
+### 🌐 Any-Database Roles (Apply across the whole instance)
+* **`readAnyDatabase`**
+  Grants `read` permissions across all databases on the server (except `local` and `config`).
+* **`readWriteAnyDatabase`**
+  Grants `readWrite` permissions across all databases on the server (except `local` and `config`).
+* **`dbAdminAnyDatabase`**
+  Grants `dbAdmin` administrative permissions across all databases on the server.
+* **`userAdminAnyDatabase`**
+  Grants `userAdmin` credentials management across all databases on the server.
+
+### ⚙️ Cluster Administration Roles
+* **`clusterAdmin`**
+  The highest administrative role for cluster operations. Combines `clusterManager`, `clusterMonitor`, and `hostManager`.
+* **`clusterManager`**
+  Allows sharding management, replica set actions, and deployment maintenance.
+* **`clusterMonitor`**
+  Provides read-only access to server monitoring metrics, `db.serverStatus()`, and monitoring tools.
+* **`hostManager`**
+  Allows monitoring and managing the server host machine (shutting down services, checking metrics).
+
+### 💾 Backup & Restore Roles
+* **`backup`**
+  Grants the minimal necessary privileges to back up data using tools like `mongodump`.
+* **`restore`**
+  Grants the privileges to restore data using tools like `mongorestore` (excluding system settings).
+
+### 👑 Superuser Role
+* **`root`**
+  Complete access to everything. Combines all "Any-Database" roles, cluster administration roles, backup/restore roles, and direct system manipulation rights.
+
+---
+
+## SECTION 3: CUSTOM SECURITY ROLE TEMPLATES
+
+### 🛠️ Template A: Custom Database Administrator ("DBA")
+**Scope:** Single Target Database (`LAB`).
+**Permissions:** Inherits basic `read` data capabilities, but restricts schema updates strictly to document insertions, modifications, index building, and collection provisioning across all collections in the target database.
+```javascript
+use LAB
+
+db.createRole({
+  createRole: "DBA",
+  privileges: [
+    { 
+      resource: { db: "LAB", collection: "" },
+      actions: [ "insert", "update", "createIndex", "createCollection" ] 
+    }
+  ],
+  roles: [
+    { role: "read", db: "LAB" }
+  ]
+})
+```
+
+### 🛠️ Template B: Instance-Wide Broad Data Writer ("Mongodb")
+**Scope:** Universal Server Scope (All Databases).
+**Permissions:** Inherits instance-wide default query reading (`readAnyDatabase` via `admin`), while adding specific granular permissions to write records and generate performance indexes across all structural layers.
+```javascript
+use admin
+
+db.createRole({
+  createRole: "Mongodb",
+  privileges: [
+    { 
+      resource: { db: "", collection: "" },
+      actions: [ "insert", "update", "createIndex" ] 
+    }
+  ],
+  roles: [
+    { role: "readAnyDatabase", db: "admin" }
+  ]
+})
+```
+
+### 🛠️ Template C: Instance-Wide Complete Global Writer ("DBA1")
+**Scope:** Universal Server Scope (All Databases).
+**Permissions:** Implements a direct global wrapper role giving comprehensive read and write modification properties across all database layers on the cluster instance.
+```javascript
+use admin
+
+db.createRole({
+  createRole: "DBA1",
+  privileges: [],
+  roles: [
+    { role: "readWriteAnyDatabase", db: "admin" }
+  ]
+})
+```
